@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Request Analyzer</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #0d1117;
+            color: #c9d1d9;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: #161b22;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+        }
+        input, textarea {
+            width: 80%;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 6px;
+            border: none;
+            background: #21262d;
+            color: #c9d1d9;
+        }
+        button {
+            padding: 10px 16px;
+            background: #ff7b00;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            transition: 0.3s;
+        }
+        button:hover {
+            background: #e66a00;
+            transform: scale(1.05);
+        }
+        table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px;
+            border: 1px solid #30363d;
+            text-align: left;
+            word-wrap: break-word;
+            max-width: 400px;
+            overflow-wrap: break-word;
+            white-space: pre-wrap;
+        }
+        th {
+            background: #ff7b00;
+            color: #ffffff;
+        }
+        .expandable {
+            max-height: 50px;
+            overflow: hidden;
+            transition: max-height 0.3s ease-in-out;
+        }
+        .expanded {
+            max-height: none;
+        }
+        .toggle-btn {
+            display: block;
+            margin-top: 5px;
+            background: #ff7b00;
+            color: white;
+            border: none;
+            padding: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .action-btn {
+            background: #007bff;
+        }
+        .action-btn:hover {
+            background: #0056b3;
+        }
+        .save-options {
+            margin-top: 20px;
+        }
+        .save-btn {
+            background: #4caf50;
+        }
+        .save-btn:hover {
+            background: #388e3c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Request Analyzer</h2>
+        <input type="text" id="urlInput" placeholder="Enter URL to analyze">
+        <textarea id="requestBody" placeholder="Enter request body (optional)"></textarea>
+        <button onclick="analyzeRequests()">Analyze</button>
+        
+        <table id="resultTable">
+            <thead>
+                <tr>
+                    <th>Request</th>
+                    <th>Response</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+
+        <div class="save-options">
+            <button class="save-btn" onclick="saveResults('json')">Save as JSON</button>
+            <button class="save-btn" onclick="saveResults('txt')">Save as TXT</button>
+            <button class="save-btn" onclick="saveResults('csv')">Save as CSV</button>
+        </div>
+    </div>
+
+    <script>
+        function analyzeRequests() {
+            const url = document.getElementById("urlInput").value;
+            const requestBody = document.getElementById("requestBody").value;
+
+            if (!url) {
+                alert("Please enter a valid URL");
+                return;
+            }
+
+            let options = { method: requestBody ? "POST" : "GET" };
+            if (requestBody) {
+                options.headers = { "Content-Type": "application/json" };
+                options.body = requestBody;
+            }
+
+            fetch(url, options)
+                .then(response => response.text().then(data => ({
+                    status: response.status,
+                    body: data,
+                    headers: [...response.headers].map(([key, value]) => `${key}: ${value}`).join("\n")
+                })))
+                .then(result => {
+                    const table = document.getElementById("resultTable").getElementsByTagName('tbody')[0];
+                    const row = table.insertRow();
+                    row.insertCell(0).innerHTML = `
+                        <strong>URL:</strong> ${url}<br>
+                        <strong>Method:</strong> ${requestBody ? "POST" : "GET"}<br>
+                        ${requestBody ? `<strong>Body:</strong> ${requestBody}` : ""}
+                        <br><br><strong>cURL:</strong> <code>${generateCurlCommand(url, requestBody)}</code>
+                    `;
+                    
+                    let responseCell = row.insertCell(1);
+                    responseCell.innerHTML = `<div class='expandable'>Status: ${result.status}<br><br>${result.body}</div>` +
+                                            `<button class='toggle-btn' onclick='toggleExpand(this)'>Expand</button>`;
+
+                    const actionCell = row.insertCell(2);
+                    actionCell.innerHTML = `
+                        <button class='action-btn' onclick='editRequest("${url}", \`${requestBody}\`)'>Edit & Resend</button>
+                        <button class='action-btn' onclick='viewFullResponse(this)'>View Full</button>
+                        <button class='action-btn' onclick='showCurlResponse("${url}", \`${requestBody}\`)'>Show Response (cURL)</button>
+                    `;
+                    actionCell.dataset.response = `Headers:\n${result.headers}\n\nResponse:\n${result.body}`;
+                })
+                .catch(error => alert("Error fetching URL: " + error));
+        }
+
+        function editRequest(url, body) {
+            document.getElementById("urlInput").value = url;
+            document.getElementById("requestBody").value = body || "";
+        }
+
+        function viewFullResponse(button) {
+            alert(button.parentElement.dataset.response);
+        }
+
+        function toggleExpand(button) {
+            const content = button.previousElementSibling;
+            content.classList.toggle("expanded");
+            button.textContent = content.classList.contains("expanded") ? "Collapse" : "Expand";
+        }
+
+        function showCurlResponse(url, body) {
+            const curlCommand = generateCurlCommand(url, body);
+            const curlWindow = window.open("", "_blank");
+            curlWindow.document.write(`<pre>Executing: ${curlCommand}\n\nLoading response...</pre>`);
+
+            fetch(url, { method: body ? "POST" : "GET", body: body ? body : null })
+                .then(response => response.text())
+                .then(data => {
+                    curlWindow.document.body.innerHTML = `<pre>Executed: ${curlCommand}\n\nResponse:\n${data}</pre>`;
+                })
+                .catch(error => {
+                    curlWindow.document.body.innerHTML = `<pre>Error executing cURL: ${error}</pre>`;
+                });
+        }
+
+        function generateCurlCommand(url, body) {
+            return body ? `curl -X POST -d '${body}' "${url}"` : `curl -X GET "${url}"`;
+        }
+    </script>
+</body>
+</html>
