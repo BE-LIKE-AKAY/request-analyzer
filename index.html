@@ -5,62 +5,76 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Request Analyzer</title>
     <style>
+        /* Dark UI with Green & Aqua Highlights */
         body {
-            font-family: 'Arial', sans-serif;
-            background-color: #0d1117;
-            color: #c9d1d9;
+            font-family: 'Consolas', monospace;
+            background-color: #0a0f0d;
+            color: #00ff7f;
             text-align: center;
             margin: 0;
             padding: 20px;
+            overflow-x: hidden;
         }
         .container {
             max-width: 900px;
             margin: auto;
-            background: #161b22;
+            background: #061a17;
             padding: 20px;
             border-radius: 12px;
-            box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 20px rgba(0, 255, 127, 0.2);
         }
-        input, textarea {
-            width: 80%;
+        input {
+            width: 75%;
             padding: 12px;
             margin: 10px 0;
             border-radius: 6px;
             border: none;
-            background: #21262d;
-            color: #c9d1d9;
+            background: #072d26;
+            color: #00ff7f;
         }
         button {
             padding: 10px 16px;
-            background: #ff7b00;
+            background: #00aaff;
             color: #ffffff;
             border: none;
             border-radius: 6px;
             cursor: pointer;
             font-size: 14px;
             margin: 5px;
-            transition: 0.3s;
+            transition: 0.3s ease-in-out;
+            box-shadow: 0 0 10px rgba(0, 170, 255, 0.4);
         }
         button:hover {
-            background: #e66a00;
-            transform: scale(1.05);
+            background: #0088cc;
+            transform: scale(1.07);
+            box-shadow: 0 0 15px rgba(0, 170, 255, 0.6);
+        }
+        .loading {
+            display: none;
+            margin-top: 10px;
+        }
+        .loading img {
+            width: 40px;
         }
         table {
             width: 100%;
             margin-top: 20px;
             border-collapse: collapse;
+            background: #061a17;
+            box-shadow: 0 0 15px rgba(0, 255, 127, 0.3);
         }
         th, td {
             padding: 12px;
-            border: 1px solid #30363d;
+            border: 1px solid #00ff7f;
             text-align: left;
             word-wrap: break-word;
-            max-width: 400px;
+            max-width: 300px;
             overflow-wrap: break-word;
             white-space: pre-wrap;
+            color: #00ff7f;
         }
         th {
-            background: #ff7b00;
+            background: #00aaff;
             color: #ffffff;
         }
         .expandable {
@@ -74,37 +88,41 @@
         .toggle-btn {
             display: block;
             margin-top: 5px;
-            background: #ff7b00;
-            color: white;
+            background: #00ff7f;
+            color: black;
             border: none;
             padding: 5px;
             border-radius: 4px;
             cursor: pointer;
         }
-        .action-btn {
-            background: #007bff;
-        }
-        .action-btn:hover {
-            background: #0056b3;
-        }
         .save-options {
             margin-top: 20px;
         }
         .save-btn {
-            background: #4caf50;
+            background: #00ff7f;
+            color: black;
         }
         .save-btn:hover {
-            background: #388e3c;
+            background: #00cc66;
+        }
+        .action-btn {
+            background: #0088cc;
+        }
+        .action-btn:hover {
+            background: #006699;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>Request Analyzer</h2>
+        <h2>🔍 Request Analyzer</h2>
         <input type="text" id="urlInput" placeholder="Enter URL to analyze">
-        <textarea id="requestBody" placeholder="Enter request body (optional)"></textarea>
         <button onclick="analyzeRequests()">Analyze</button>
         
+        <div class="loading" id="loading">
+            <img src="https://i.gifer.com/4V0b.gif" alt="Loading...">
+        </div>
+
         <table id="resultTable">
             <thead>
                 <tr>
@@ -127,57 +145,66 @@
     <script>
         function analyzeRequests() {
             const url = document.getElementById("urlInput").value;
-            const requestBody = document.getElementById("requestBody").value;
-
             if (!url) {
                 alert("Please enter a valid URL");
                 return;
             }
 
-            let options = { method: requestBody ? "POST" : "GET" };
-            if (requestBody) {
-                options.headers = { "Content-Type": "application/json" };
-                options.body = requestBody;
-            }
+            document.getElementById("loading").style.display = "block";
 
-            fetch(url, options)
-                .then(response => response.text().then(data => ({
-                    status: response.status,
-                    body: data,
-                    headers: [...response.headers].map(([key, value]) => `${key}: ${value}`).join("\n")
-                })))
+            fetch(url)
+                .then(response => response.text().then(data => ({ status: response.status, body: data })))
                 .then(result => {
+                    document.getElementById("loading").style.display = "none";
+                    
                     const table = document.getElementById("resultTable").getElementsByTagName('tbody')[0];
                     const row = table.insertRow();
-                    row.insertCell(0).innerHTML = `
-                        <strong>URL:</strong> ${url}<br>
-                        <strong>Method:</strong> ${requestBody ? "POST" : "GET"}<br>
-                        ${requestBody ? `<strong>Body:</strong> ${requestBody}` : ""}
-                        <br><br><strong>cURL:</strong> <code>${generateCurlCommand(url, requestBody)}</code>
-                    `;
+                    row.insertCell(0).innerText = url;
                     
                     let responseCell = row.insertCell(1);
-                    responseCell.innerHTML = `<div class='expandable'>Status: ${result.status}<br><br>${result.body}</div>` +
-                                            `<button class='toggle-btn' onclick='toggleExpand(this)'>Expand</button>`;
-
-                    const actionCell = row.insertCell(2);
-                    actionCell.innerHTML = `
-                        <button class='action-btn' onclick='editRequest("${url}", \`${requestBody}\`)'>Edit & Resend</button>
-                        <button class='action-btn' onclick='viewFullResponse(this)'>View Full</button>
-                        <button class='action-btn' onclick='showCurlResponse("${url}", \`${requestBody}\`)'>Show Response (cURL)</button>
+                    responseCell.innerHTML = `
+                        <div class='expandable'>Status: ${result.status}\n\nResponse:\n${result.body}</div>
+                        <button class='toggle-btn' onclick='toggleExpand(this)'>Expand</button>
                     `;
-                    actionCell.dataset.response = `Headers:\n${result.headers}\n\nResponse:\n${result.body}`;
+                    
+                    const actionCell = row.insertCell(2);
+                    const curlCommand = `curl -X GET "${url}"`;
+
+                    actionCell.innerHTML = `
+                        <button class='action-btn' onclick='editRequest("${url}")'>Edit & Resend</button>
+                        <button class='action-btn' onclick='viewFullResponse(${JSON.stringify(result.body)})'>View Full</button>
+                        <button class='action-btn' onclick='copyCurlCommand(\`${curlCommand}\`)'>Copy cURL</button>
+                    `;
                 })
-                .catch(error => alert("Error fetching URL: " + error));
+                .catch(error => {
+                    document.getElementById("loading").style.display = "none";
+                    alert("Error fetching URL: " + error);
+                });
         }
 
-        function editRequest(url, body) {
+        function editRequest(url) {
             document.getElementById("urlInput").value = url;
-            document.getElementById("requestBody").value = body || "";
+            analyzeRequests();  // Resend request
         }
 
-        function viewFullResponse(button) {
-            alert(button.parentElement.dataset.response);
+        function viewFullResponse(response) {
+            let formattedJson = JSON.stringify(response, null, 4);
+            let newTab = window.open("", "_blank");
+            newTab.document.write(`
+                <html>
+                <head>
+                    <title>Full Response</title>
+                    <style>
+                        body { background-color: black; color: #00ff7f; font-family: monospace; white-space: pre-wrap; }
+                        pre { padding: 10px; border-radius: 10px; background: #061a17; }
+                    </style>
+                </head>
+                <body>
+                    <h2>Full Response</h2>
+                    <pre>${formattedJson}</pre>
+                </body>
+                </html>
+            `);
         }
 
         function toggleExpand(button) {
@@ -186,23 +213,12 @@
             button.textContent = content.classList.contains("expanded") ? "Collapse" : "Expand";
         }
 
-        function showCurlResponse(url, body) {
-            const curlCommand = generateCurlCommand(url, body);
-            const curlWindow = window.open("", "_blank");
-            curlWindow.document.write(`<pre>Executing: ${curlCommand}\n\nLoading response...</pre>`);
-
-            fetch(url, { method: body ? "POST" : "GET", body: body ? body : null })
-                .then(response => response.text())
-                .then(data => {
-                    curlWindow.document.body.innerHTML = `<pre>Executed: ${curlCommand}\n\nResponse:\n${data}</pre>`;
-                })
-                .catch(error => {
-                    curlWindow.document.body.innerHTML = `<pre>Error executing cURL: ${error}</pre>`;
-                });
-        }
-
-        function generateCurlCommand(url, body) {
-            return body ? `curl -X POST -d '${body}' "${url}"` : `curl -X GET "${url}"`;
+        function copyCurlCommand(command) {
+            navigator.clipboard.writeText(command).then(() => {
+                alert("cURL command copied to clipboard!");
+            }).catch(err => {
+                alert("Failed to copy cURL command: " + err);
+            });
         }
     </script>
 </body>
