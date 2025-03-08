@@ -8,10 +8,6 @@
 ## 🎨 Features  
 - ✅ **Analyze HTTP Requests & Responses**  
 - ✅ **View Security Headers**  
-- ✅ **Show Latency (Response Time)**  
-- ✅ **Perform DNS Lookup (Check Target IP & Domain Info)**  
-- ✅ **Copy Perfect cURL Commands**  
-- ✅ **Detect Server Security Headers**  
 - ✅ **View Full Response in a New Tab (JSON Format)**  
 - ✅ **Expand/Collapse Large Responses**  
 - ✅ **Custom Headers & Request Body Support (Optional)**  
