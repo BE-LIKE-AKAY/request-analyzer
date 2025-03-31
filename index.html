@@ -263,13 +263,6 @@
         .history-item:hover {
             background: #072d26;
         }
-        /* Security and Performance Styles */
-        .security-info, .performance-info {
-            margin-top: 10px;
-            padding: 10px;
-            border: 1px solid #00aaff;
-            border-radius: 4px;
-        }
     </style>
 </head>
 <body>
@@ -349,9 +342,7 @@
         </select>
         <textarea id="requestBody" rows="4" placeholder="Request Body (Optional)"></textarea>
         <input type="text" id="headersInput" placeholder="Custom Headers (e.g., Key: Value, Key: Value)">
-        <input type="text" id="cookiesInput" placeholder="Cookies (e.g., name=value; name2=value2)">
         <button onclick="analyzeRequest()">Analyze</button>
-        <button onclick="repeatRequest()">Repeat Request</button>
         
         <div class="loading" id="loading">
             <img src="https://i.gifer.com/4V0b.gif" alt="Loading...">
@@ -418,17 +409,20 @@
         </div>
     </div>
 
+    <!-- Shared Response Container -->
+    <div class="container" id="sharedResponseContainer" style="display: none;"></div>
+
     <script>
         // Firebase configuration (replace with your own)
         const firebaseConfig = {
-             apiKey: "AIzaSyDxlaoe8a2TPTsoYoeWLUhfuAwB-QZc_mA",
-             authDomain: "request-analyzer-46230.firebaseapp.com",
-             databaseURL: "https://request-analyzer-46230-default-rtdb.firebaseio.com",
-             projectId: "request-analyzer-46230",
-             storageBucket: "request-analyzer-46230.firebasestorage.app",
-             messagingSenderId: "700305798828",
-             appId: "1:700305798828:web:6feab35aa5b99b28c81109",
-             measurementId: "G-K989Q737VH"
+            apiKey: "AIzaSyDxlaoe8a2TPTsoYoeWLUhfuAwB-QZc_mA",
+  authDomain: "request-analyzer-46230.firebaseapp.com",
+  databaseURL: "https://request-analyzer-46230-default-rtdb.firebaseio.com",
+  projectId: "request-analyzer-46230",
+  storageBucket: "request-analyzer-46230.firebasestorage.app",
+  messagingSenderId: "700305798828",
+  appId: "1:700305798828:web:6feab35aa5b99b28c81109",
+  measurementId: "G-K989Q737VH"
         };
 
         // Initialize Firebase
@@ -481,7 +475,7 @@
             }
         }
 
-        // Load activity history
+        // Load activity history with shareable URLs
         async function loadActivityHistory() {
             const historyRef = db.collection('users').doc(currentUser.uid).collection('activity').orderBy('timestamp', 'desc').limit(50);
             const snapshot = await historyRef.get();
@@ -496,15 +490,19 @@
                 const item = document.createElement('div');
                 item.className = 'history-item';
                 item.innerHTML = `<p><strong>${activity.action}</strong> - ${activity.timestamp.toDate().toLocaleString()}</p>${activity.details ? `<p>${activity.details}</p>` : ''}`;
+                if (activity.shareUrl) {
+                    item.innerHTML += `<br><a href="${activity.shareUrl}" target="_blank">View Shared Response</a>`;
+                }
                 historyContainer.appendChild(item);
             });
         }
 
-        // Record activity
-        async function recordActivity(action, details = null) {
+        // Record activity with shareable URL
+        async function recordActivity(action, details = null, shareUrl = null) {
             await db.collection('users').doc(currentUser.uid).collection('activity').add({
                 action: action,
                 details: details,
+                shareUrl: shareUrl,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
             loadActivityHistory();
@@ -634,12 +632,14 @@
         function showAuthContainer() {
             document.getElementById('authContainer').style.display = 'flex';
             document.getElementById('appContent').style.display = 'none';
+            document.getElementById('sharedResponseContainer').style.display = 'none';
         }
 
         // Show app content
         function showAppContent() {
             document.getElementById('authContainer').style.display = 'none';
             document.getElementById('appContent').style.display = 'block';
+            document.getElementById('sharedResponseContainer').style.display = 'none';
         }
 
         // Analyze request
@@ -648,7 +648,6 @@
             const method = document.getElementById("methodSelect").value;
             const body = document.getElementById("requestBody").value;
             const headersInput = document.getElementById("headersInput").value;
-            const cookiesInput = document.getElementById("cookiesInput").value;
 
             if (!url) {
                 alert("Please enter a valid URL");
@@ -662,66 +661,42 @@
                     if (key && value) headers[key] = value;
                 });
             }
-            if (cookiesInput) {
-                headers["Cookie"] = cookiesInput;
-            }
 
             document.getElementById("loading").style.display = "block";
 
-            const startTime = performance.now();
             fetch(url, {
                 method: method,
                 headers: headers,
                 body: method !== "GET" && body ? body : null
             })
-            .then(response => {
-                const endTime = performance.now();
-                const latency = (endTime - startTime).toFixed(2);
-                return response.text().then(data => ({
-                    status: response.status,
-                    headers: Object.fromEntries(response.headers.entries()),
-                    body: data,
-                    latency: latency
-                }));
-            })
-            .then(result => {
+            .then(response => response.text().then(data => ({
+                status: response.status,
+                headers: Object.fromEntries(response.headers.entries()),
+                body: data
+            })))
+            .then(async result => {
                 document.getElementById("loading").style.display = "none";
                 const table = document.getElementById("resultTable").getElementsByTagName('tbody')[0];
                 const row = table.insertRow();
                 row.insertCell(0).innerText = `${method} ${url}`;
 
-                const responseId = `response-${Date.now()}`;
+                const shareId = await saveResponseToFirestore(result, method, url);
+                const shareUrl = `${window.location.origin}${window.location.pathname}?share=${shareId}`;
                 let responseCell = row.insertCell(1);
                 let showExpand = result.body.length > 500;
 
-                const securityInfo = analyzeSecurity(result.headers);
-                const performanceInfo = `Request Latency: ${result.latency}ms`;
-                const serverInfo = detectServerInfo(result.headers);
-
                 responseCell.innerHTML = `
-                    ${showExpand ? `<button class="toggle-btn" onclick="toggleResponse('${responseId}')">Expand</button>` : ""}
-                    <div id="${responseId}" class="response-container" style="${showExpand ? 'display: none;' : ''}">
+                    ${showExpand ? `<button class="toggle-btn" onclick="toggleResponse('${shareId}')">Expand</button>` : ""}
+                    <div id="response-${shareId}" class="response-container" style="${showExpand ? 'display: none;' : ''}">
                         <div class="response-header">Status: ${result.status}</div>
                         <div class="response-content">${formatStatus(result.status)}</div>
                         <div class="response-header">Headers</div>
                         <div class="response-content">${formatHeaders(result.headers)}</div>
                         <div class="response-header">Body</div>
                         <div class="response-content"><pre><code class="language-json">${formatBody(result.body)}</code></pre></div>
-                        <div class="security-info">
-                            <div class="response-header">Security Analysis</div>
-                            <div class="response-content">${securityInfo}</div>
-                        </div>
-                        <div class="performance-info">
-                            <div class="response-header">Performance</div>
-                            <div class="response-content">${performanceInfo}</div>
-                        </div>
-                        <div class="performance-info">
-                            <div class="response-header">Server Info</div>
-                            <div class="response-content">${serverInfo}</div>
-                        </div>
                         <div class="share-section">
-                            <input class="share-link" id="share-${responseId}" value="${window.location.origin}/view?data=${btoa(JSON.stringify(result))}" readonly>
-                            <button class="copy-btn" onclick="copyShareLink('${responseId}')">Copy</button>
+                            <input class="share-link" id="share-${shareId}" value="${shareUrl}" readonly>
+                            <button class="copy-btn" onclick="copyShareLink('${shareId}')">Copy</button>
                         </div>
                     </div>
                 `;
@@ -729,11 +704,11 @@
                 const actionCell = row.insertCell(2);
                 actionCell.innerHTML = `
                     <button class="action-btn" onclick='viewFullResponse(${JSON.stringify(result)})'><i class="fas fa-eye"></i> View Full</button>
-                    <button class="share-btn" onclick="shareRequest('${responseId}')"><i class="fas fa-share-alt"></i> Share</button>
+                    <button class="share-btn" onclick="shareRequest('${shareId}')"><i class="fas fa-share-alt"></i> Share</button>
                 `;
 
                 Prism.highlightAll();
-                recordActivity('API Request', `${method} ${url} - Status: ${result.status}`);
+                await recordActivity('API Request', `${method} ${url} - Status: ${result.status}`, shareUrl);
             })
             .catch(error => {
                 document.getElementById("loading").style.display = "none";
@@ -742,15 +717,18 @@
             });
         }
 
-        // Repeat request
-        function repeatRequest() {
-            const url = document.getElementById("urlInput").value;
-            if (!url) {
-                alert("Please enter a URL to repeat");
-                return;
-            }
-            analyzeRequest();
-            recordActivity('Repeated Request', `Repeated: ${document.getElementById("methodSelect").value} ${url}`);
+        // Save response to Firestore
+        async function saveResponseToFirestore(result, method, url) {
+            const responseDoc = await db.collection('responses').add({
+                userId: currentUser ? currentUser.uid : null,
+                method: method,
+                url: url,
+                status: result.status,
+                headers: result.headers,
+                body: result.body,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            return responseDoc.id;
         }
 
         // Format status
@@ -774,42 +752,24 @@
             }
         }
 
-        // Analyze security
-        function analyzeSecurity(headers) {
-            let securityNotes = [];
-            if (!headers['content-security-policy']) securityNotes.push("Missing Content-Security-Policy header.");
-            if (!headers['strict-transport-security']) securityNotes.push("Missing Strict-Transport-Security (HSTS) header.");
-            if (!headers['x-frame-options']) securityNotes.push("Missing X-Frame-Options header.");
-            if (!headers['x-content-type-options']) securityNotes.push("Missing X-Content-Type-Options header.");
-            return securityNotes.length > 0 ? securityNotes.join("<br>") : "No major security issues detected.";
-        }
-
-        // Detect server info
-        function detectServerInfo(headers) {
-            const server = headers['server'] || 'Unknown';
-            const poweredBy = headers['x-powered-by'] || 'Not specified';
-            return `Server: ${server}<br>X-Powered-By: ${poweredBy}`;
-        }
-
         // Toggle response
         function toggleResponse(responseId) {
-            const responseDiv = document.getElementById(responseId);
+            const responseDiv = document.getElementById(`response-${responseId}`);
             responseDiv.style.display = responseDiv.style.display === "none" ? "block" : "none";
         }
 
         // Copy share link
-        function copyShareLink(responseId) {
-            const linkInput = document.getElementById(`share-${responseId}`);
+        function copyShareLink(shareId) {
+            const linkInput = document.getElementById(`share-${shareId}`);
             linkInput.select();
             document.execCommand('copy');
             alert('Share link copied to clipboard!');
         }
 
         // Share request
-        function shareRequest(responseId) {
-            const linkInput = document.getElementById(`share-${responseId}`);
-            const shareableLink = linkInput.value;
-            navigator.clipboard.writeText(shareableLink);
+        function shareRequest(shareId) {
+            const linkInput = document.getElementById(`share-${shareId}`);
+            navigator.clipboard.writeText(linkInput.value);
             alert("Link copied to clipboard!");
         }
 
@@ -823,17 +783,49 @@
             newWindow.document.write("</body></html>");
         }
 
-        // Initialize app
+        // Display shared response
+        function displaySharedResponse(data) {
+            const container = document.getElementById('sharedResponseContainer');
+            container.innerHTML = `
+                <h2>Shared Response</h2>
+                <div class="response-container">
+                    <div class="response-header">Status: ${data.status}</div>
+                    <div class="response-content">${formatStatus(data.status)}</div>
+                    <div class="response-header">Headers</div>
+                    <div class="response-content">${formatHeaders(data.headers)}</div>
+                    <div class="response-header">Body</div>
+                    <div class="response-content"><pre><code class="language-json">${formatBody(data.body)}</code></pre></div>
+                </div>
+            `;
+            container.style.display = 'block';
+            document.getElementById('appContent').style.display = 'none';
+            document.getElementById('authContainer').style.display = 'none';
+            Prism.highlightAll();
+        }
+
+        // Check for shared response on load
         window.onload = function() {
-            auth.onAuthStateChanged(user => {
-                if (user) {
-                    currentUser = user;
-                    loadUserData();
-                    showAppContent();
-                } else {
-                    showAuthContainer();
-                }
-            });
+            const urlParams = new URLSearchParams(window.location.search);
+            const shareId = urlParams.get('share');
+            if (shareId) {
+                db.collection('responses').doc(shareId).get().then(doc => {
+                    if (doc.exists) {
+                        displaySharedResponse(doc.data());
+                    } else {
+                        alert('Shared response not found');
+                    }
+                });
+            } else {
+                auth.onAuthStateChanged(user => {
+                    if (user) {
+                        currentUser = user;
+                        loadUserData();
+                        showAppContent();
+                    } else {
+                        showAuthContainer();
+                    }
+                });
+            }
         };
     </script>
 </body>
