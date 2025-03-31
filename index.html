@@ -16,7 +16,7 @@
             background-color: #0a0f0d;
             color: #00ff7f;
             margin: 0;
-            padding: 0;
+            padding: 20px;
         }
         .container {
             max-width: 900px;
@@ -90,14 +90,43 @@
             cursor: pointer;
         }
         .response-container {
-            display: none;
+            position: relative;
+            padding: 15px;
+            border: 1px solid #00ff7f;
             margin-top: 10px;
-            padding: 10px;
-            background: #072d26;
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0, 255, 127, 0.2);
         }
-        
+        .share-section {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #00ff7f;
+        }
+        .share-link {
+            width: 70%;
+            padding: 8px;
+            background: #061a17;
+            border: 1px solid #00aaff;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .copy-btn {
+            padding: 8px 12px;
+            background: #00ff7f;
+            color: black;
+            margin-left: 5px;
+        }
+        .response-header {
+            color: #00aaff;
+            margin: 10px 0 5px;
+            font-weight: bold;
+        }
+        .response-content {
+            background: #04100e;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
         /* Auth System Styles */
         .auth-container {
             display: none;
@@ -155,7 +184,6 @@
         .auth-link:hover {
             text-decoration: underline;
         }
-        
         /* User Info Styles */
         .user-header {
             display: flex;
@@ -189,7 +217,6 @@
             background: #ff5555;
             color: white;
         }
-        
         /* Profile Page Styles */
         .profile-container {
             display: none;
@@ -228,13 +255,10 @@
     <div class="auth-container" id="authContainer">
         <div class="auth-box">
             <h2>🔒 Request Analyzer</h2>
-            
             <div class="auth-tabs">
                 <div class="auth-tab active" onclick="switchAuthTab('login')">Login</div>
                 <div class="auth-tab" onclick="switchAuthTab('signup')">Sign Up</div>
             </div>
-            
-            <!-- Login Form -->
             <div class="auth-content active" id="loginAuth">
                 <div class="form-group">
                     <input type="email" id="loginEmail" placeholder="Email" class="form-control">
@@ -248,8 +272,6 @@
                 </div>
                 <div id="loginError" class="error-message" style="color: #ff5555; margin-top: 10px;"></div>
             </div>
-            
-            <!-- Sign Up Form -->
             <div class="auth-content" id="signupAuth">
                 <div class="form-group">
                     <input type="text" id="signupName" placeholder="Full Name" class="form-control">
@@ -269,8 +291,6 @@
                 </div>
                 <div id="signupError" class="error-message" style="color: #ff5555; margin-top: 10px;"></div>
             </div>
-            
-            <!-- Forgot Password Form -->
             <div class="auth-content" id="forgotAuth">
                 <div class="form-group">
                     <input type="email" id="forgotEmail" placeholder="Your Email" class="form-control">
@@ -354,9 +374,7 @@
         
         <div class="profile-section">
             <h3>Activity History</h3>
-            <div id="activityHistory">
-                <!-- Activity history will be loaded here -->
-            </div>
+            <div id="activityHistory"></div>
         </div>
         
         <div class="profile-section">
@@ -379,14 +397,14 @@
     <script>
         // Firebase configuration
         const firebaseConfig = {
-              apiKey: "AIzaSyDxlaoe8a2TPTsoYoeWLUhfuAwB-QZc_mA",
-  authDomain: "request-analyzer-46230.firebaseapp.com",
-  databaseURL: "https://request-analyzer-46230-default-rtdb.firebaseio.com",
-  projectId: "request-analyzer-46230",
-  storageBucket: "request-analyzer-46230.firebasestorage.app",
-  messagingSenderId: "700305798828",
-  appId: "1:700305798828:web:6feab35aa5b99b28c81109",
-  measurementId: "G-K989Q737VH"
+            apiKey: "AIzaSyDxlaoe8a2TPTsoYoeWLUhfuAwB-QZc_mA",
+            authDomain: "request-analyzer-46230.firebaseapp.com",
+            databaseURL: "https://request-analyzer-46230-default-rtdb.firebaseio.com",
+            projectId: "request-analyzer-46230",
+            storageBucket: "request-analyzer-46230.firebasestorage.app",
+            messagingSenderId: "700305798828",
+            appId: "1:700305798828:web:6feab35aa5b99b28c81109",
+            measurementId: "G-K989Q737VH"
         };
 
         // Initialize Firebase
@@ -394,24 +412,19 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
         
-        // Current user data
         let currentUser = null;
         let userData = null;
 
-        // Check auth state on page load
         auth.onAuthStateChanged(user => {
             if (user) {
-                // User is signed in
                 currentUser = user;
                 loadUserData();
                 showAppContent();
             } else {
-                // No user is signed in
                 showAuthContainer();
             }
         });
 
-        // Load user data from Firestore
         async function loadUserData() {
             const userDoc = await db.collection('users').doc(currentUser.uid).get();
             if (userDoc.exists) {
@@ -419,39 +432,32 @@
                 updateUserDisplay();
                 loadActivityHistory();
             } else {
-                // Create new user document if it doesn't exist
                 await db.collection('users').doc(currentUser.uid).set({
                     name: currentUser.displayName || currentUser.email.split('@')[0],
                     email: currentUser.email,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     lastLogin: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                loadUserData(); // Reload after creation
+                loadUserData();
             }
         }
 
-        // Update user information display
         function updateUserDisplay() {
             document.getElementById('userName').textContent = userData.name;
             document.getElementById('userAvatar').textContent = userData.name.charAt(0).toUpperCase();
-            
-            // Profile page
             document.getElementById('profileName').textContent = userData.name;
             document.getElementById('profileEmail').textContent = userData.email;
             document.getElementById('editName').value = userData.name;
-            
             if (userData.createdAt) {
                 const createdDate = userData.createdAt.toDate();
                 document.getElementById('profileCreated').textContent = createdDate.toLocaleString();
             }
         }
 
-        // Load user activity history
         async function loadActivityHistory() {
             const historyRef = db.collection('users').doc(currentUser.uid).collection('activity')
                 .orderBy('timestamp', 'desc')
                 .limit(50);
-            
             const snapshot = await historyRef.get();
             const historyContainer = document.getElementById('activityHistory');
             historyContainer.innerHTML = '';
@@ -473,42 +479,33 @@
             });
         }
 
-        // Record user activity
         async function recordActivity(action, details = null) {
             await db.collection('users').doc(currentUser.uid).collection('activity').add({
                 action: action,
                 details: details,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
-            loadActivityHistory(); // Refresh the history display
+            loadActivityHistory();
         }
 
-        // Switch between auth tabs
         function switchAuthTab(tab) {
             document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.auth-content').forEach(c => c.classList.remove('active'));
-            
             document.querySelector(`.auth-tab[onclick="switchAuthTab('${tab}')"]`).classList.add('active');
             document.getElementById(`${tab}Auth`).classList.add('active');
-            
-            // Clear errors when switching tabs
             document.getElementById('loginError').textContent = '';
             document.getElementById('signupError').textContent = '';
             document.getElementById('forgotError').textContent = '';
             document.getElementById('forgotSuccess').textContent = '';
         }
 
-        // Login with email/password
         function login() {
             const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPassword').value;
             const errorElement = document.getElementById('loginError');
-            
             errorElement.textContent = '';
-            
             auth.signInWithEmailAndPassword(email, password)
                 .then(async (userCredential) => {
-                    // Update last login time
                     await db.collection('users').doc(userCredential.user.uid).update({
                         lastLogin: firebase.firestore.FieldValue.serverTimestamp()
                     });
@@ -519,34 +516,26 @@
                 });
         }
 
-        // Sign up new user
         function signup() {
             const name = document.getElementById('signupName').value;
             const email = document.getElementById('signupEmail').value;
             const password = document.getElementById('signupPassword').value;
             const confirmPassword = document.getElementById('signupConfirmPassword').value;
             const errorElement = document.getElementById('signupError');
-            
             errorElement.textContent = '';
-            
             if (password !== confirmPassword) {
                 errorElement.textContent = 'Passwords do not match';
                 return;
             }
-            
             auth.createUserWithEmailAndPassword(email, password)
                 .then(async (userCredential) => {
-                    // Create user document
                     await db.collection('users').doc(userCredential.user.uid).set({
                         name: name,
                         email: email,
                         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                         lastLogin: firebase.firestore.FieldValue.serverTimestamp()
                     });
-                    
-                    // Send email verification
                     await userCredential.user.sendEmailVerification();
-                    
                     recordActivity('New account created');
                     alert('Account created successfully! Please check your email for verification.');
                 })
@@ -555,15 +544,12 @@
                 });
         }
 
-        // Send password reset email
         function sendPasswordReset() {
             const email = document.getElementById('forgotEmail').value;
             const errorElement = document.getElementById('forgotError');
             const successElement = document.getElementById('forgotSuccess');
-            
             errorElement.textContent = '';
             successElement.textContent = '';
-            
             auth.sendPasswordResetEmail(email)
                 .then(() => {
                     successElement.textContent = 'Password reset email sent. Please check your inbox.';
@@ -574,7 +560,6 @@
                 });
         }
 
-        // Logout
         function logout() {
             auth.signOut()
                 .then(() => {
@@ -586,44 +571,36 @@
                 });
         }
 
-        // Show profile page
         function showProfile() {
             document.getElementById('appContent').style.display = 'none';
             document.getElementById('profileContainer').style.display = 'block';
         }
 
-        // Hide profile page
         function hideProfile() {
             document.getElementById('profileContainer').style.display = 'none';
             document.getElementById('appContent').style.display = 'block';
         }
 
-        // Show edit form
         function showEditForm() {
             document.getElementById('editForm').style.display = 'block';
             document.getElementById('profileError').textContent = '';
             document.getElementById('profileSuccess').textContent = '';
         }
 
-        // Hide edit form
         function hideEditForm() {
             document.getElementById('editForm').style.display = 'none';
         }
 
-        // Update profile
         function updateProfile() {
             const newName = document.getElementById('editName').value;
             const errorElement = document.getElementById('profileError');
             const successElement = document.getElementById('profileSuccess');
-            
             errorElement.textContent = '';
             successElement.textContent = '';
-            
             if (!newName) {
                 errorElement.textContent = 'Name cannot be empty';
                 return;
             }
-            
             db.collection('users').doc(currentUser.uid).update({
                 name: newName
             })
@@ -639,36 +616,25 @@
             });
         }
 
-        // Change password
         function changePassword() {
             const currentPassword = document.getElementById('currentPassword').value;
             const newPassword = document.getElementById('newPassword').value;
             const confirmPassword = document.getElementById('confirmPassword').value;
             const errorElement = document.getElementById('passwordError');
             const successElement = document.getElementById('passwordSuccess');
-            
             errorElement.textContent = '';
             successElement.textContent = '';
-            
             if (newPassword !== confirmPassword) {
                 errorElement.textContent = 'New passwords do not match';
                 return;
             }
-            
             if (newPassword.length < 6) {
                 errorElement.textContent = 'Password must be at least 6 characters';
                 return;
             }
-            
-            // Reauthenticate user
-            const credential = firebase.auth.EmailAuthProvider.credential(
-                currentUser.email, 
-                currentPassword
-            );
-            
+            const credential = firebase.auth.EmailAuthProvider.credential(currentUser.email, currentPassword);
             currentUser.reauthenticateWithCredential(credential)
                 .then(() => {
-                    // Change password
                     return currentUser.updatePassword(newPassword);
                 })
                 .then(() => {
@@ -683,37 +649,30 @@
                 });
         }
 
-        // Show auth container
         function showAuthContainer() {
             document.getElementById('authContainer').style.display = 'flex';
             document.getElementById('appContent').style.display = 'none';
             document.getElementById('profileContainer').style.display = 'none';
-            
-            // Reset forms
             document.getElementById('loginEmail').value = '';
             document.getElementById('loginPassword').value = '';
             document.getElementById('loginError').textContent = '';
-            
             document.getElementById('signupName').value = '';
             document.getElementById('signupEmail').value = '';
             document.getElementById('signupPassword').value = '';
             document.getElementById('signupConfirmPassword').value = '';
             document.getElementById('signupError').textContent = '';
-            
             document.getElementById('forgotEmail').value = '';
             document.getElementById('forgotError').textContent = '';
             document.getElementById('forgotSuccess').textContent = '';
         }
 
-        // Show app content
         function showAppContent() {
             document.getElementById('authContainer').style.display = 'none';
             document.getElementById('appContent').style.display = 'block';
             document.getElementById('profileContainer').style.display = 'none';
         }
 
-        // Your existing request analyzer functions with activity tracking
-        function analyzeRequest() {
+        async function analyzeRequest() {
             const url = document.getElementById("urlInput").value;
             const method = document.getElementById("methodSelect").value;
             const body = document.getElementById("requestBody").value;
@@ -728,9 +687,7 @@
             if (headersInput) {
                 headersInput.split(",").forEach(header => {
                     const [key, value] = header.split(":").map(item => item.trim());
-                    if (key && value) {
-                        headers[key] = value;
-                    }
+                    if (key && value) headers[key] = value;
                 });
             }
 
@@ -748,22 +705,28 @@
             })))
             .then(async result => {
                 document.getElementById("loading").style.display = "none";
-                
                 const table = document.getElementById("resultTable").getElementsByTagName('tbody')[0];
                 const row = table.insertRow();
                 row.insertCell(0).innerText = `${method} ${url}`;
 
+                const responseId = `response-${Date.now()}`;
+                const shareId = await saveResponseToFirestore(result, method, url);
                 let responseCell = row.insertCell(1);
-                let responseId = `response-${Date.now()}`;
                 let showExpand = result.body.length > 500;
 
                 responseCell.innerHTML = `
                     ${showExpand ? `<button class="toggle-btn" onclick="toggleResponse('${responseId}')">Expand</button>` : ""}
-                    <div id="${responseId}" class="response-container">
-                        <b>Status:</b> ${result.status}<br>
-                        <b>Response Headers:</b><br>
-                        ${JSON.stringify(result.headers, null, 2).replace(/\\n/g, "<br>")}<br>
-                        <b>Response Body:</b><br>${result.body}
+                    <div id="${responseId}" class="response-container" style="${showExpand ? 'display: none;' : ''}">
+                        <div class="response-header">Status: ${result.status}</div>
+                        <div class="response-content">${formatStatus(result.status)}</div>
+                        <div class="response-header">Headers</div>
+                        <div class="response-content">${formatHeaders(result.headers)}</div>
+                        <div class="response-header">Body</div>
+                        <div class="response-content">${formatBody(result.body)}</div>
+                        <div class="share-section">
+                            <input class="share-link" id="share-${shareId}" value="${window.location.origin}/share/${shareId}" readonly>
+                            <button class="copy-btn" onclick="copyShareLink('${shareId}')">Copy</button>
+                        </div>
                     </div>
                 `;
 
@@ -771,8 +734,6 @@
                 actionCell.innerHTML = `
                     <button class='action-btn' onclick='viewFullResponse(${JSON.stringify(result)})'>View Full</button>
                 `;
-                
-                // Record this activity
                 await recordActivity('API Request', `${method} ${url}`);
             })
             .catch(error => {
@@ -782,13 +743,47 @@
             });
         }
 
+        async function saveResponseToFirestore(result, method, url) {
+            const responseDoc = await db.collection('responses').add({
+                userId: currentUser ? currentUser.uid : null,
+                method: method,
+                url: url,
+                status: result.status,
+                headers: result.headers,
+                body: result.body,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            return responseDoc.id;
+        }
+
+        function formatStatus(status) {
+            const color = status >= 200 && status < 300 ? '#00ff7f' : status >= 400 ? '#ff5555' : '#ffffff';
+            return `<span style="color: ${color}">${status}</span>`;
+        }
+
+        function formatHeaders(headers) {
+            return `<pre>${JSON.stringify(headers, null, 2)}</pre>`;
+        }
+
+        function formatBody(body) {
+            try {
+                const parsed = JSON.parse(body);
+                return `<pre>${JSON.stringify(parsed, null, 2)}</pre>`;
+            } catch (e) {
+                return `<pre>${body}</pre>`;
+            }
+        }
+
         function toggleResponse(responseId) {
             const responseDiv = document.getElementById(responseId);
-            if (responseDiv.style.display === "none") {
-                responseDiv.style.display = "block";
-            } else {
-                responseDiv.style.display = "none";
-            }
+            responseDiv.style.display = responseDiv.style.display === "none" ? "block" : "none";
+        }
+
+        function copyShareLink(shareId) {
+            const linkInput = document.getElementById(`share-${shareId}`);
+            linkInput.select();
+            document.execCommand('copy');
+            alert('Share link copied to clipboard!');
         }
 
         function viewFullResponse(response) {
@@ -800,16 +795,39 @@
             newWindow.document.write("</body></html>");
         }
 
-        // Initialize on page load
+        function checkForSharedResponse() {
+            const path = window.location.pathname;
+            if (path.startsWith('/share/')) {
+                const shareId = path.split('/share/')[1];
+                loadSharedResponse(shareId);
+            }
+        }
+
+        async function loadSharedResponse(shareId) {
+            const responseDoc = await db.collection('responses').doc(shareId).get();
+            if (responseDoc.exists) {
+                const data = responseDoc.data();
+                const result = {
+                    status: data.status,
+                    headers: data.headers,
+                    body: data.body
+                };
+                viewFullResponse(result);
+            } else {
+                alert('Shared response not found');
+            }
+        }
+
         window.onload = function() {
-            // Check if user is already authenticated
             auth.onAuthStateChanged(user => {
                 if (user) {
                     currentUser = user;
                     loadUserData();
                     showAppContent();
+                    checkForSharedResponse();
                 } else {
                     showAuthContainer();
+                    checkForSharedResponse();
                 }
             });
         };
