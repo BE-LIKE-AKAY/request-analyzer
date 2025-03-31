@@ -1,5 +1,4 @@
-
-       <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -11,21 +10,27 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.4/css/all.min.css">
+    <!-- Prism.js for syntax highlighting -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.25.0/themes/prism.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.25.0/prism.min.js"></script>
+    <!-- Google Fonts: Orbitron -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: 'Consolas', monospace;
-            background: linear-gradient(to bottom right, #0a0f0d, #003322);
-            color: #00ff7f;
+            font-family: 'Orbitron', sans-serif;
+            background: linear-gradient(to bottom right, #0a0f0d, #001a0d);
+            color: #ffffff;
             margin: 0;
             padding: 20px;
         }
         .container {
-            max-width: 900px;
+            max-width: 1000px;
             margin: auto;
             background: #061a17;
             padding: 20px;
             border-radius: 12px;
             box-shadow: 0 0 20px #00ff7f33;
+            border: 1px solid #00ff7f;
         }
         input, select, textarea {
             width: 75%;
@@ -39,20 +44,18 @@
         }
         button {
             padding: 10px 16px;
-            background: #00aaff;
-            color: #ffffff;
+            background: #00ff7f;
+            color: #0a0f0d;
             border: none;
             border-radius: 6px;
             cursor: pointer;
             font-size: 14px;
             margin: 5px;
-            transition: 0.3s ease-in-out;
-            box-shadow: 0 0 10px #00aaff66;
+            transition: transform 0.2s ease;
         }
         button:hover {
-            background: #0088cc;
-            transform: scale(1.07);
-            box-shadow: 0 0 15px #00aaff99;
+            transform: scale(1.07) rotate(2deg);
+            box-shadow: 0 0 15px #00ff7f;
         }
         .loading {
             display: none;
@@ -127,6 +130,17 @@
             padding: 10px;
             border-radius: 4px;
             font-size: 13px;
+        }
+        .action-column button {
+            background: #00ff7f;
+            color: #0a0f0d;
+            border: none;
+            padding: 8px 16px;
+            transition: transform 0.2s ease;
+        }
+        .action-column button:hover {
+            transform: scale(1.07) rotate(2deg);
+            box-shadow: 0 0 15px #00ff7f;
         }
         /* Auth System Styles */
         .auth-container {
@@ -249,6 +263,13 @@
         .history-item:hover {
             background: #072d26;
         }
+        /* Security and Performance Styles */
+        .security-info, .performance-info {
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #00aaff;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
@@ -328,7 +349,9 @@
         </select>
         <textarea id="requestBody" rows="4" placeholder="Request Body (Optional)"></textarea>
         <input type="text" id="headersInput" placeholder="Custom Headers (e.g., Key: Value, Key: Value)">
+        <input type="text" id="cookiesInput" placeholder="Cookies (e.g., name=value; name2=value2)">
         <button onclick="analyzeRequest()">Analyze</button>
+        <button onclick="repeatRequest()">Repeat Request</button>
         
         <div class="loading" id="loading">
             <img src="https://i.gifer.com/4V0b.gif" alt="Loading...">
@@ -375,7 +398,6 @@
         
         <div class="profile-section">
             <h3>Activity History</h3>
-            <input type="text" id="historySearch" placeholder="Search history" oninput="filterHistory()">
             <div id="activityHistory"></div>
         </div>
         
@@ -397,16 +419,16 @@
     </div>
 
     <script>
-        // Firebase configuration (replace with your own Firebase project config)
+        // Firebase configuration (replace with your own)
         const firebaseConfig = {
-            apiKey: "AIzaSyDxlaoe8a2TPTsoYoeWLUhfuAwB-QZc_mA",
-            authDomain: "request-analyzer-46230.firebaseapp.com",
-            databaseURL: "https://request-analyzer-46230-default-rtdb.firebaseio.com",
-            projectId: "request-analyzer-46230",
-            storageBucket: "request-analyzer-46230.firebasestorage.app",
-            messagingSenderId: "700305798828",
-            appId: "1:700305798828:web:6feab35aa5b99b28c81109",
-            measurementId: "G-K989Q737VH"
+             apiKey: "AIzaSyDxlaoe8a2TPTsoYoeWLUhfuAwB-QZc_mA",
+             authDomain: "request-analyzer-46230.firebaseapp.com",
+             databaseURL: "https://request-analyzer-46230-default-rtdb.firebaseio.com",
+             projectId: "request-analyzer-46230",
+             storageBucket: "request-analyzer-46230.firebasestorage.app",
+             messagingSenderId: "700305798828",
+             appId: "1:700305798828:web:6feab35aa5b99b28c81109",
+             measurementId: "G-K989Q737VH"
         };
 
         // Initialize Firebase
@@ -428,7 +450,7 @@
             }
         });
 
-        // Load user data from Firestore
+        // Load user data
         async function loadUserData() {
             const userDoc = await db.collection('users').doc(currentUser.uid).get();
             if (userDoc.exists) {
@@ -446,7 +468,7 @@
             }
         }
 
-        // Update UI with user data
+        // Update user display
         function updateUserDisplay() {
             document.getElementById('userName').textContent = userData.name;
             document.getElementById('userAvatar').textContent = userData.name.charAt(0).toUpperCase();
@@ -461,70 +483,51 @@
 
         // Load activity history
         async function loadActivityHistory() {
-            const historyRef = db.collection('users').doc(currentUser.uid).collection('activity')
-                .orderBy('timestamp', 'desc')
-                .limit(50);
+            const historyRef = db.collection('users').doc(currentUser.uid).collection('activity').orderBy('timestamp', 'desc').limit(50);
             const snapshot = await historyRef.get();
             const historyContainer = document.getElementById('activityHistory');
             historyContainer.innerHTML = '';
-            
             if (snapshot.empty) {
                 historyContainer.innerHTML = '<p>No activity history yet.</p>';
                 return;
             }
-            
             snapshot.forEach(doc => {
                 const activity = doc.data();
                 const item = document.createElement('div');
                 item.className = 'history-item';
-                item.innerHTML = `
-                    <p><strong>${activity.action}</strong> - ${activity.timestamp.toDate().toLocaleString()}</p>
-                    ${activity.details ? `<p>${activity.details}</p>` : ''}
-                    ${activity.responseId ? `<a href="/share/${activity.responseId}" target="_blank">View Response</a>` : ''}
-                `;
+                item.innerHTML = `<p><strong>${activity.action}</strong> - ${activity.timestamp.toDate().toLocaleString()}</p>${activity.details ? `<p>${activity.details}</p>` : ''}`;
                 historyContainer.appendChild(item);
             });
         }
 
-        // Record user activity in Firestore
-        async function recordActivity(action, details = null, responseId = null) {
+        // Record activity
+        async function recordActivity(action, details = null) {
             await db.collection('users').doc(currentUser.uid).collection('activity').add({
                 action: action,
                 details: details,
-                responseId: responseId,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
             loadActivityHistory();
         }
 
-        // Switch between auth tabs (login, signup, forgot password)
+        // Switch auth tabs
         function switchAuthTab(tab) {
             document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.auth-content').forEach(c => c.classList.remove('active'));
             document.querySelector(`.auth-tab[onclick="switchAuthTab('${tab}')"]`).classList.add('active');
             document.getElementById(`${tab}Auth`).classList.add('active');
-            document.getElementById('loginError').textContent = '';
-            document.getElementById('signupError').textContent = '';
-            document.getElementById('forgotError').textContent = '';
-            document.getElementById('forgotSuccess').textContent = '';
         }
 
         // Login function
         function login() {
             const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPassword').value;
-            const errorElement = document.getElementById('loginError');
-            errorElement.textContent = '';
             auth.signInWithEmailAndPassword(email, password)
-                .then(async (userCredential) => {
-                    await db.collection('users').doc(userCredential.user.uid).update({
-                        lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-                    });
+                .then(async () => {
+                    await db.collection('users').doc(currentUser.uid).update({ lastLogin: firebase.firestore.FieldValue.serverTimestamp() });
                     recordActivity('User logged in');
                 })
-                .catch(error => {
-                    errorElement.textContent = error.message;
-                });
+                .catch(error => document.getElementById('loginError').textContent = error.message);
         }
 
         // Signup function
@@ -533,10 +536,8 @@
             const email = document.getElementById('signupEmail').value;
             const password = document.getElementById('signupPassword').value;
             const confirmPassword = document.getElementById('signupConfirmPassword').value;
-            const errorElement = document.getElementById('signupError');
-            errorElement.textContent = '';
             if (password !== confirmPassword) {
-                errorElement.textContent = 'Passwords do not match';
+                document.getElementById('signupError').textContent = 'Passwords do not match';
                 return;
             }
             auth.createUserWithEmailAndPassword(email, password)
@@ -549,40 +550,25 @@
                     });
                     await userCredential.user.sendEmailVerification();
                     recordActivity('New account created');
-                    alert('Account created successfully! Please check your email for verification.');
+                    alert('Account created! Please check your email for verification.');
                 })
-                .catch(error => {
-                    errorElement.textContent = error.message;
-                });
+                .catch(error => document.getElementById('signupError').textContent = error.message);
         }
 
-        // Send password reset email
+        // Send password reset
         function sendPasswordReset() {
             const email = document.getElementById('forgotEmail').value;
-            const errorElement = document.getElementById('forgotError');
-            const successElement = document.getElementById('forgotSuccess');
-            errorElement.textContent = '';
-            successElement.textContent = '';
             auth.sendPasswordResetEmail(email)
-                .then(() => {
-                    successElement.textContent = 'Password reset email sent. Please check your inbox.';
-                    recordActivity('Password reset requested');
-                })
-                .catch(error => {
-                    errorElement.textContent = error.message;
-                });
+                .then(() => document.getElementById('forgotSuccess').textContent = 'Password reset email sent.')
+                .catch(error => document.getElementById('forgotError').textContent = error.message);
         }
 
         // Logout function
         function logout() {
-            auth.signOut()
-                .then(() => {
-                    recordActivity('User logged out');
-                    showAuthContainer();
-                })
-                .catch(error => {
-                    console.error('Logout error:', error);
-                });
+            auth.signOut().then(() => {
+                recordActivity('User logged out');
+                showAuthContainer();
+            });
         }
 
         // Show profile page
@@ -597,109 +583,72 @@
             document.getElementById('appContent').style.display = 'block';
         }
 
-        // Show edit profile form
+        // Show edit form
         function showEditForm() {
             document.getElementById('editForm').style.display = 'block';
-            document.getElementById('profileError').textContent = '';
-            document.getElementById('profileSuccess').textContent = '';
         }
 
-        // Hide edit profile form
+        // Hide edit form
         function hideEditForm() {
             document.getElementById('editForm').style.display = 'none';
         }
 
-        // Update user profile
+        // Update profile
         function updateProfile() {
             const newName = document.getElementById('editName').value;
-            const errorElement = document.getElementById('profileError');
-            const successElement = document.getElementById('profileSuccess');
-            errorElement.textContent = '';
-            successElement.textContent = '';
             if (!newName) {
-                errorElement.textContent = 'Name cannot be empty';
+                document.getElementById('profileError').textContent = 'Name cannot be empty';
                 return;
             }
-            db.collection('users').doc(currentUser.uid).update({
-                name: newName
-            })
-            .then(() => {
-                successElement.textContent = 'Profile updated successfully!';
-                userData.name = newName;
-                updateUserDisplay();
-                recordActivity('Profile updated', `Name changed to ${newName}`);
-                setTimeout(hideEditForm, 2000);
-            })
-            .catch(error => {
-                errorElement.textContent = error.message;
-            });
+            db.collection('users').doc(currentUser.uid).update({ name: newName })
+                .then(() => {
+                    userData.name = newName;
+                    updateUserDisplay();
+                    recordActivity('Profile updated', `Name changed to ${newName}`);
+                    document.getElementById('profileSuccess').textContent = 'Profile updated successfully!';
+                    setTimeout(hideEditForm, 2000);
+                })
+                .catch(error => document.getElementById('profileError').textContent = error.message);
         }
 
-        // Change user password
+        // Change password
         function changePassword() {
             const currentPassword = document.getElementById('currentPassword').value;
             const newPassword = document.getElementById('newPassword').value;
             const confirmPassword = document.getElementById('confirmPassword').value;
-            const errorElement = document.getElementById('passwordError');
-            const successElement = document.getElementById('passwordSuccess');
-            errorElement.textContent = '';
-            successElement.textContent = '';
             if (newPassword !== confirmPassword) {
-                errorElement.textContent = 'New passwords do not match';
-                return;
-            }
-            if (newPassword.length < 6) {
-                errorElement.textContent = 'Password must be at least 6 characters';
+                document.getElementById('passwordError').textContent = 'Passwords do not match';
                 return;
             }
             const credential = firebase.auth.EmailAuthProvider.credential(currentUser.email, currentPassword);
             currentUser.reauthenticateWithCredential(credential)
+                .then(() => currentUser.updatePassword(newPassword))
                 .then(() => {
-                    return currentUser.updatePassword(newPassword);
-                })
-                .then(() => {
-                    successElement.textContent = 'Password changed successfully!';
-                    document.getElementById('currentPassword').value = '';
-                    document.getElementById('newPassword').value = '';
-                    document.getElementById('confirmPassword').value = '';
+                    document.getElementById('passwordSuccess').textContent = 'Password changed successfully!';
                     recordActivity('Password changed');
                 })
-                .catch(error => {
-                    errorElement.textContent = error.message;
-                });
+                .catch(error => document.getElementById('passwordError').textContent = error.message);
         }
 
-        // Show authentication container
+        // Show auth container
         function showAuthContainer() {
             document.getElementById('authContainer').style.display = 'flex';
             document.getElementById('appContent').style.display = 'none';
-            document.getElementById('profileContainer').style.display = 'none';
-            document.getElementById('loginEmail').value = '';
-            document.getElementById('loginPassword').value = '';
-            document.getElementById('loginError').textContent = '';
-            document.getElementById('signupName').value = '';
-            document.getElementById('signupEmail').value = '';
-            document.getElementById('signupPassword').value = '';
-            document.getElementById('signupConfirmPassword').value = '';
-            document.getElementById('signupError').textContent = '';
-            document.getElementById('forgotEmail').value = '';
-            document.getElementById('forgotError').textContent = '';
-            document.getElementById('forgotSuccess').textContent = '';
         }
 
-        // Show main app content
+        // Show app content
         function showAppContent() {
             document.getElementById('authContainer').style.display = 'none';
             document.getElementById('appContent').style.display = 'block';
-            document.getElementById('profileContainer').style.display = 'none';
         }
 
-        // Analyze HTTP request
+        // Analyze request
         async function analyzeRequest() {
             const url = document.getElementById("urlInput").value;
             const method = document.getElementById("methodSelect").value;
             const body = document.getElementById("requestBody").value;
             const headersInput = document.getElementById("headersInput").value;
+            const cookiesInput = document.getElementById("cookiesInput").value;
 
             if (!url) {
                 alert("Please enter a valid URL");
@@ -713,29 +662,41 @@
                     if (key && value) headers[key] = value;
                 });
             }
+            if (cookiesInput) {
+                headers["Cookie"] = cookiesInput;
+            }
 
             document.getElementById("loading").style.display = "block";
 
+            const startTime = performance.now();
             fetch(url, {
                 method: method,
                 headers: headers,
-                body: body ? body : null
+                body: method !== "GET" && body ? body : null
             })
-            .then(response => response.text().then(data => ({
-                status: response.status,
-                headers: Object.fromEntries(response.headers.entries()),
-                body: data
-            })))
-            .then(async result => {
+            .then(response => {
+                const endTime = performance.now();
+                const latency = (endTime - startTime).toFixed(2);
+                return response.text().then(data => ({
+                    status: response.status,
+                    headers: Object.fromEntries(response.headers.entries()),
+                    body: data,
+                    latency: latency
+                }));
+            })
+            .then(result => {
                 document.getElementById("loading").style.display = "none";
                 const table = document.getElementById("resultTable").getElementsByTagName('tbody')[0];
                 const row = table.insertRow();
                 row.insertCell(0).innerText = `${method} ${url}`;
 
                 const responseId = `response-${Date.now()}`;
-                const shareId = await saveResponseToFirestore(result, method, url);
                 let responseCell = row.insertCell(1);
                 let showExpand = result.body.length > 500;
+
+                const securityInfo = analyzeSecurity(result.headers);
+                const performanceInfo = `Request Latency: ${result.latency}ms`;
+                const serverInfo = detectServerInfo(result.headers);
 
                 responseCell.innerHTML = `
                     ${showExpand ? `<button class="toggle-btn" onclick="toggleResponse('${responseId}')">Expand</button>` : ""}
@@ -745,21 +706,34 @@
                         <div class="response-header">Headers</div>
                         <div class="response-content">${formatHeaders(result.headers)}</div>
                         <div class="response-header">Body</div>
-                        <div class="response-content">${formatBody(result.body)}</div>
+                        <div class="response-content"><pre><code class="language-json">${formatBody(result.body)}</code></pre></div>
+                        <div class="security-info">
+                            <div class="response-header">Security Analysis</div>
+                            <div class="response-content">${securityInfo}</div>
+                        </div>
+                        <div class="performance-info">
+                            <div class="response-header">Performance</div>
+                            <div class="response-content">${performanceInfo}</div>
+                        </div>
+                        <div class="performance-info">
+                            <div class="response-header">Server Info</div>
+                            <div class="response-content">${serverInfo}</div>
+                        </div>
                         <div class="share-section">
-                            <input class="share-link" id="share-${shareId}" value="${window.location.origin}/share/${shareId}" readonly>
-                            <button class="copy-btn" onclick="copyShareLink('${shareId}')">Copy</button>
-                            <a href="https://x.com/intent/tweet?text=Check%20out%20this%20response:%20${encodeURI(window.location.origin + '/share/' + shareId)}" target="_blank"><i class="fab fa-twitter"></i> Share on X</a>
-                            <a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURI(window.location.origin + '/share/' + shareId)}" target="_blank"><i class="fab fa-facebook"></i> Share on Facebook</a>
+                            <input class="share-link" id="share-${responseId}" value="${window.location.origin}/view?data=${btoa(JSON.stringify(result))}" readonly>
+                            <button class="copy-btn" onclick="copyShareLink('${responseId}')">Copy</button>
                         </div>
                     </div>
                 `;
 
                 const actionCell = row.insertCell(2);
                 actionCell.innerHTML = `
-                    <button class='action-btn' onclick='viewFullResponse(${JSON.stringify(result)})'>View Full</button>
+                    <button class="action-btn" onclick='viewFullResponse(${JSON.stringify(result)})'><i class="fas fa-eye"></i> View Full</button>
+                    <button class="share-btn" onclick="shareRequest('${responseId}')"><i class="fas fa-share-alt"></i> Share</button>
                 `;
-                await recordActivity('API Request', `${method} ${url}`, shareId);
+
+                Prism.highlightAll();
+                recordActivity('API Request', `${method} ${url} - Status: ${result.status}`);
             })
             .catch(error => {
                 document.getElementById("loading").style.display = "none";
@@ -768,111 +742,96 @@
             });
         }
 
-        // Save response to Firestore
-        async function saveResponseToFirestore(result, method, url) {
-            const responseDoc = await db.collection('responses').add({
-                userId: currentUser ? currentUser.uid : null,
-                method: method,
-                url: url,
-                status: result.status,
-                headers: result.headers,
-                body: result.body,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            return responseDoc.id;
+        // Repeat request
+        function repeatRequest() {
+            const url = document.getElementById("urlInput").value;
+            if (!url) {
+                alert("Please enter a URL to repeat");
+                return;
+            }
+            analyzeRequest();
+            recordActivity('Repeated Request', `Repeated: ${document.getElementById("methodSelect").value} ${url}`);
         }
 
-        // Format status code with color
+        // Format status
         function formatStatus(status) {
             const color = status >= 200 && status < 300 ? '#00ff7f' : status >= 400 ? '#ff5555' : '#ffffff';
             return `<span style="color: ${color}">${status}</span>`;
         }
 
-        // Format headers as JSON
+        // Format headers
         function formatHeaders(headers) {
             return `<pre>${JSON.stringify(headers, null, 2)}</pre>`;
         }
 
-        // Format response body (JSON if possible)
+        // Format body
         function formatBody(body) {
             try {
                 const parsed = JSON.parse(body);
-                return `<pre>${JSON.stringify(parsed, null, 2)}</pre>`;
+                return JSON.stringify(parsed, null, 2);
             } catch (e) {
-                return `<pre>${body}</pre>`;
+                return body;
             }
         }
 
-        // Toggle response visibility
+        // Analyze security
+        function analyzeSecurity(headers) {
+            let securityNotes = [];
+            if (!headers['content-security-policy']) securityNotes.push("Missing Content-Security-Policy header.");
+            if (!headers['strict-transport-security']) securityNotes.push("Missing Strict-Transport-Security (HSTS) header.");
+            if (!headers['x-frame-options']) securityNotes.push("Missing X-Frame-Options header.");
+            if (!headers['x-content-type-options']) securityNotes.push("Missing X-Content-Type-Options header.");
+            return securityNotes.length > 0 ? securityNotes.join("<br>") : "No major security issues detected.";
+        }
+
+        // Detect server info
+        function detectServerInfo(headers) {
+            const server = headers['server'] || 'Unknown';
+            const poweredBy = headers['x-powered-by'] || 'Not specified';
+            return `Server: ${server}<br>X-Powered-By: ${poweredBy}`;
+        }
+
+        // Toggle response
         function toggleResponse(responseId) {
             const responseDiv = document.getElementById(responseId);
             responseDiv.style.display = responseDiv.style.display === "none" ? "block" : "none";
         }
 
-        // Copy share link to clipboard
-        function copyShareLink(shareId) {
-            const linkInput = document.getElementById(`share-${shareId}`);
+        // Copy share link
+        function copyShareLink(responseId) {
+            const linkInput = document.getElementById(`share-${responseId}`);
             linkInput.select();
             document.execCommand('copy');
             alert('Share link copied to clipboard!');
         }
 
-        // View full response in new window
+        // Share request
+        function shareRequest(responseId) {
+            const linkInput = document.getElementById(`share-${responseId}`);
+            const shareableLink = linkInput.value;
+            navigator.clipboard.writeText(shareableLink);
+            alert("Link copied to clipboard!");
+        }
+
+        // View full response
         function viewFullResponse(response) {
             const newWindow = window.open();
             newWindow.document.write("<html><head><title>Full Response</title>");
-            newWindow.document.write("<style>body { font-family: 'Consolas', monospace; background: #0a0f0d; color: #00ff7f; } pre { white-space: pre-wrap; }</style></head><body>");
+            newWindow.document.write("<style>body { font-family: 'Orbitron', sans-serif; background: #0a0f0d; color: #00ff7f; } pre { white-space: pre-wrap; }</style></head><body>");
             newWindow.document.write("<h2>Full Response</h2>");
             newWindow.document.write("<pre>" + JSON.stringify(response, null, 2) + "</pre>");
             newWindow.document.write("</body></html>");
         }
 
-        // Filter activity history based on search input
-        function filterHistory() {
-            const searchTerm = document.getElementById('historySearch').value.toLowerCase();
-            const historyItems = document.getElementById('activityHistory').getElementsByClassName('history-item');
-            Array.from(historyItems).forEach(item => {
-                const text = item.textContent.toLowerCase();
-                item.style.display = text.includes(searchTerm) ? 'block' : 'none';
-            });
-        }
-
-        // Check for shared response on page load
-        function checkForSharedResponse() {
-            const path = window.location.pathname;
-            if (path.startsWith('/share/')) {
-                const shareId = path.split('/share/')[1];
-                loadSharedResponse(shareId);
-            }
-        }
-
-        // Load shared response from Firestore
-        async function loadSharedResponse(shareId) {
-            const responseDoc = await db.collection('responses').doc(shareId).get();
-            if (responseDoc.exists) {
-                const data = responseDoc.data();
-                const result = {
-                    status: data.status,
-                    headers: data.headers,
-                    body: data.body
-                };
-                viewFullResponse(result);
-            } else {
-                alert('Shared response not found');
-            }
-        }
-
-        // Initialize app on page load
+        // Initialize app
         window.onload = function() {
             auth.onAuthStateChanged(user => {
                 if (user) {
                     currentUser = user;
                     loadUserData();
                     showAppContent();
-                    checkForSharedResponse();
                 } else {
                     showAuthContainer();
-                    checkForSharedResponse();
                 }
             });
         };
