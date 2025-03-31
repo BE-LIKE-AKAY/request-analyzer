@@ -1,4 +1,5 @@
-<!DOCTYPE html>
+
+       <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -8,12 +9,12 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.4/css/all.min.css">
     <style>
         body {
             font-family: 'Consolas', monospace;
-            background-color: #0a0f0d;
+            background: linear-gradient(to bottom right, #0a0f0d, #003322);
             color: #00ff7f;
             margin: 0;
             padding: 20px;
@@ -24,7 +25,7 @@
             background: #061a17;
             padding: 20px;
             border-radius: 12px;
-            box-shadow: 0 0 20px rgba(0, 255, 127, 0.2);
+            box-shadow: 0 0 20px #00ff7f33;
         }
         input, select, textarea {
             width: 75%;
@@ -46,12 +47,12 @@
             font-size: 14px;
             margin: 5px;
             transition: 0.3s ease-in-out;
-            box-shadow: 0 0 10px rgba(0, 170, 255, 0.4);
+            box-shadow: 0 0 10px #00aaff66;
         }
         button:hover {
             background: #0088cc;
             transform: scale(1.07);
-            box-shadow: 0 0 15px rgba(0, 170, 255, 0.6);
+            box-shadow: 0 0 15px #00aaff99;
         }
         .loading {
             display: none;
@@ -65,7 +66,7 @@
             margin-top: 20px;
             border-collapse: collapse;
             background: #061a17;
-            box-shadow: 0 0 15px rgba(0, 255, 127, 0.3);
+            box-shadow: 0 0 15px #00ff7f33;
         }
         th, td {
             padding: 12px;
@@ -95,7 +96,7 @@
             border: 1px solid #00ff7f;
             margin-top: 10px;
             border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 255, 127, 0.2);
+            box-shadow: 0 0 10px #00ff7f33;
         }
         .share-section {
             margin-top: 10px;
@@ -145,7 +146,7 @@
             padding: 30px;
             border-radius: 12px;
             width: 350px;
-            box-shadow: 0 0 20px rgba(0, 255, 127, 0.3);
+            box-shadow: 0 0 20px #00ff7f33;
         }
         .auth-box h2 {
             margin-top: 0;
@@ -374,6 +375,7 @@
         
         <div class="profile-section">
             <h3>Activity History</h3>
+            <input type="text" id="historySearch" placeholder="Search history" oninput="filterHistory()">
             <div id="activityHistory"></div>
         </div>
         
@@ -395,7 +397,7 @@
     </div>
 
     <script>
-        // Firebase configuration
+        // Firebase configuration (replace with your own Firebase project config)
         const firebaseConfig = {
             apiKey: "AIzaSyDxlaoe8a2TPTsoYoeWLUhfuAwB-QZc_mA",
             authDomain: "request-analyzer-46230.firebaseapp.com",
@@ -415,6 +417,7 @@
         let currentUser = null;
         let userData = null;
 
+        // Authentication state listener
         auth.onAuthStateChanged(user => {
             if (user) {
                 currentUser = user;
@@ -425,6 +428,7 @@
             }
         });
 
+        // Load user data from Firestore
         async function loadUserData() {
             const userDoc = await db.collection('users').doc(currentUser.uid).get();
             if (userDoc.exists) {
@@ -442,6 +446,7 @@
             }
         }
 
+        // Update UI with user data
         function updateUserDisplay() {
             document.getElementById('userName').textContent = userData.name;
             document.getElementById('userAvatar').textContent = userData.name.charAt(0).toUpperCase();
@@ -454,6 +459,7 @@
             }
         }
 
+        // Load activity history
         async function loadActivityHistory() {
             const historyRef = db.collection('users').doc(currentUser.uid).collection('activity')
                 .orderBy('timestamp', 'desc')
@@ -474,20 +480,24 @@
                 item.innerHTML = `
                     <p><strong>${activity.action}</strong> - ${activity.timestamp.toDate().toLocaleString()}</p>
                     ${activity.details ? `<p>${activity.details}</p>` : ''}
+                    ${activity.responseId ? `<a href="/share/${activity.responseId}" target="_blank">View Response</a>` : ''}
                 `;
                 historyContainer.appendChild(item);
             });
         }
 
-        async function recordActivity(action, details = null) {
+        // Record user activity in Firestore
+        async function recordActivity(action, details = null, responseId = null) {
             await db.collection('users').doc(currentUser.uid).collection('activity').add({
                 action: action,
                 details: details,
+                responseId: responseId,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
             loadActivityHistory();
         }
 
+        // Switch between auth tabs (login, signup, forgot password)
         function switchAuthTab(tab) {
             document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.auth-content').forEach(c => c.classList.remove('active'));
@@ -499,6 +509,7 @@
             document.getElementById('forgotSuccess').textContent = '';
         }
 
+        // Login function
         function login() {
             const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPassword').value;
@@ -516,6 +527,7 @@
                 });
         }
 
+        // Signup function
         function signup() {
             const name = document.getElementById('signupName').value;
             const email = document.getElementById('signupEmail').value;
@@ -544,6 +556,7 @@
                 });
         }
 
+        // Send password reset email
         function sendPasswordReset() {
             const email = document.getElementById('forgotEmail').value;
             const errorElement = document.getElementById('forgotError');
@@ -560,6 +573,7 @@
                 });
         }
 
+        // Logout function
         function logout() {
             auth.signOut()
                 .then(() => {
@@ -571,26 +585,31 @@
                 });
         }
 
+        // Show profile page
         function showProfile() {
             document.getElementById('appContent').style.display = 'none';
             document.getElementById('profileContainer').style.display = 'block';
         }
 
+        // Hide profile page
         function hideProfile() {
             document.getElementById('profileContainer').style.display = 'none';
             document.getElementById('appContent').style.display = 'block';
         }
 
+        // Show edit profile form
         function showEditForm() {
             document.getElementById('editForm').style.display = 'block';
             document.getElementById('profileError').textContent = '';
             document.getElementById('profileSuccess').textContent = '';
         }
 
+        // Hide edit profile form
         function hideEditForm() {
             document.getElementById('editForm').style.display = 'none';
         }
 
+        // Update user profile
         function updateProfile() {
             const newName = document.getElementById('editName').value;
             const errorElement = document.getElementById('profileError');
@@ -616,6 +635,7 @@
             });
         }
 
+        // Change user password
         function changePassword() {
             const currentPassword = document.getElementById('currentPassword').value;
             const newPassword = document.getElementById('newPassword').value;
@@ -649,6 +669,7 @@
                 });
         }
 
+        // Show authentication container
         function showAuthContainer() {
             document.getElementById('authContainer').style.display = 'flex';
             document.getElementById('appContent').style.display = 'none';
@@ -666,12 +687,14 @@
             document.getElementById('forgotSuccess').textContent = '';
         }
 
+        // Show main app content
         function showAppContent() {
             document.getElementById('authContainer').style.display = 'none';
             document.getElementById('appContent').style.display = 'block';
             document.getElementById('profileContainer').style.display = 'none';
         }
 
+        // Analyze HTTP request
         async function analyzeRequest() {
             const url = document.getElementById("urlInput").value;
             const method = document.getElementById("methodSelect").value;
@@ -726,6 +749,8 @@
                         <div class="share-section">
                             <input class="share-link" id="share-${shareId}" value="${window.location.origin}/share/${shareId}" readonly>
                             <button class="copy-btn" onclick="copyShareLink('${shareId}')">Copy</button>
+                            <a href="https://x.com/intent/tweet?text=Check%20out%20this%20response:%20${encodeURI(window.location.origin + '/share/' + shareId)}" target="_blank"><i class="fab fa-twitter"></i> Share on X</a>
+                            <a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURI(window.location.origin + '/share/' + shareId)}" target="_blank"><i class="fab fa-facebook"></i> Share on Facebook</a>
                         </div>
                     </div>
                 `;
@@ -734,7 +759,7 @@
                 actionCell.innerHTML = `
                     <button class='action-btn' onclick='viewFullResponse(${JSON.stringify(result)})'>View Full</button>
                 `;
-                await recordActivity('API Request', `${method} ${url}`);
+                await recordActivity('API Request', `${method} ${url}`, shareId);
             })
             .catch(error => {
                 document.getElementById("loading").style.display = "none";
@@ -743,6 +768,7 @@
             });
         }
 
+        // Save response to Firestore
         async function saveResponseToFirestore(result, method, url) {
             const responseDoc = await db.collection('responses').add({
                 userId: currentUser ? currentUser.uid : null,
@@ -756,15 +782,18 @@
             return responseDoc.id;
         }
 
+        // Format status code with color
         function formatStatus(status) {
             const color = status >= 200 && status < 300 ? '#00ff7f' : status >= 400 ? '#ff5555' : '#ffffff';
             return `<span style="color: ${color}">${status}</span>`;
         }
 
+        // Format headers as JSON
         function formatHeaders(headers) {
             return `<pre>${JSON.stringify(headers, null, 2)}</pre>`;
         }
 
+        // Format response body (JSON if possible)
         function formatBody(body) {
             try {
                 const parsed = JSON.parse(body);
@@ -774,11 +803,13 @@
             }
         }
 
+        // Toggle response visibility
         function toggleResponse(responseId) {
             const responseDiv = document.getElementById(responseId);
             responseDiv.style.display = responseDiv.style.display === "none" ? "block" : "none";
         }
 
+        // Copy share link to clipboard
         function copyShareLink(shareId) {
             const linkInput = document.getElementById(`share-${shareId}`);
             linkInput.select();
@@ -786,6 +817,7 @@
             alert('Share link copied to clipboard!');
         }
 
+        // View full response in new window
         function viewFullResponse(response) {
             const newWindow = window.open();
             newWindow.document.write("<html><head><title>Full Response</title>");
@@ -795,6 +827,17 @@
             newWindow.document.write("</body></html>");
         }
 
+        // Filter activity history based on search input
+        function filterHistory() {
+            const searchTerm = document.getElementById('historySearch').value.toLowerCase();
+            const historyItems = document.getElementById('activityHistory').getElementsByClassName('history-item');
+            Array.from(historyItems).forEach(item => {
+                const text = item.textContent.toLowerCase();
+                item.style.display = text.includes(searchTerm) ? 'block' : 'none';
+            });
+        }
+
+        // Check for shared response on page load
         function checkForSharedResponse() {
             const path = window.location.pathname;
             if (path.startsWith('/share/')) {
@@ -803,6 +846,7 @@
             }
         }
 
+        // Load shared response from Firestore
         async function loadSharedResponse(shareId) {
             const responseDoc = await db.collection('responses').doc(shareId).get();
             if (responseDoc.exists) {
@@ -818,6 +862,7 @@
             }
         }
 
+        // Initialize app on page load
         window.onload = function() {
             auth.onAuthStateChanged(user => {
                 if (user) {
