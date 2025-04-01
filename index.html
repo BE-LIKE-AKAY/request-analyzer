@@ -22,25 +22,30 @@
             color: #ffffff;
             margin: 0;
             padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
         }
         .container {
             max-width: 1000px;
-            margin: auto;
             background: #061a17;
             padding: 20px;
             border-radius: 12px;
             box-shadow: 0 0 20px #00ff7f33;
             border: 1px solid #00ff7f;
+            text-align: center;
         }
         input, select, textarea {
             width: 75%;
             padding: 10px;
-            margin: 8px 0;
+            margin: 8px auto;
             border-radius: 6px;
             border: none;
             background: #072d26;
             color: #00ff7f;
             font-size: 14px;
+            display: block;
         }
         button {
             padding: 10px 16px;
@@ -161,11 +166,11 @@
             border-radius: 12px;
             width: 350px;
             box-shadow: 0 0 20px #00ff7f33;
+            text-align: center;
         }
         .auth-box h2 {
             margin-top: 0;
             color: #00ff7f;
-            text-align: center;
         }
         .auth-tabs {
             display: flex;
@@ -189,7 +194,6 @@
             display: block;
         }
         .auth-footer {
-            text-align: center;
             margin-top: 15px;
         }
         .auth-link {
@@ -262,6 +266,9 @@
         }
         .history-item:hover {
             background: #072d26;
+        }
+        .history-actions button {
+            margin: 0 5px;
         }
     </style>
 </head>
@@ -342,6 +349,7 @@
         </select>
         <textarea id="requestBody" rows="4" placeholder="Request Body (Optional)"></textarea>
         <input type="text" id="headersInput" placeholder="Custom Headers (e.g., Key: Value, Key: Value)">
+        <input type="text" id="cookiesInput" placeholder="Cookies (e.g., name=value; name2=value2)">
         <button onclick="analyzeRequest()">Analyze</button>
         
         <div class="loading" id="loading">
@@ -409,9 +417,6 @@
         </div>
     </div>
 
-    <!-- Shared Response Container -->
-    <div class="container" id="sharedResponseContainer" style="display: none;"></div>
-
     <script>
         // Firebase configuration (replace with your own)
         const firebaseConfig = {
@@ -475,7 +480,7 @@
             }
         }
 
-        // Load activity history with shareable URLs
+        // Load activity history
         async function loadActivityHistory() {
             const historyRef = db.collection('users').doc(currentUser.uid).collection('activity').orderBy('timestamp', 'desc').limit(50);
             const snapshot = await historyRef.get();
@@ -489,20 +494,26 @@
                 const activity = doc.data();
                 const item = document.createElement('div');
                 item.className = 'history-item';
-                item.innerHTML = `<p><strong>${activity.action}</strong> - ${activity.timestamp.toDate().toLocaleString()}</p>${activity.details ? `<p>${activity.details}</p>` : ''}`;
-                if (activity.shareUrl) {
-                    item.innerHTML += `<br><a href="${activity.shareUrl}" target="_blank">View Shared Response</a>`;
-                }
+                item.innerHTML = `
+                    <p><strong>${activity.action}</strong> - ${activity.timestamp.toDate().toLocaleString()}</p>
+                    ${activity.details ? `<p>${activity.details}</p>` : ''}
+                    ${activity.shareUrl ? `<p>Share URL: <a href="${activity.shareUrl}" target="_blank">${activity.shareUrl}</a></p>` : ''}
+                    <div class="history-actions">
+                        <button onclick="editRequest('${doc.id}')"><i class="fas fa-edit"></i> Edit</button>
+                        <button onclick="resendRequest('${doc.id}')"><i class="fas fa-redo"></i> Resend</button>
+                    </div>
+                `;
                 historyContainer.appendChild(item);
             });
         }
 
         // Record activity with shareable URL
-        async function recordActivity(action, details = null, shareUrl = null) {
+        async function recordActivity(action, details = null, shareUrl = null, requestData = null) {
             await db.collection('users').doc(currentUser.uid).collection('activity').add({
                 action: action,
                 details: details,
                 shareUrl: shareUrl,
+                requestData: requestData,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
             loadActivityHistory();
@@ -632,14 +643,28 @@
         function showAuthContainer() {
             document.getElementById('authContainer').style.display = 'flex';
             document.getElementById('appContent').style.display = 'none';
-            document.getElementById('sharedResponseContainer').style.display = 'none';
+            document.getElementById('profileContainer').style.display = 'none';
         }
 
         // Show app content
         function showAppContent() {
             document.getElementById('authContainer').style.display = 'none';
             document.getElementById('appContent').style.display = 'block';
-            document.getElementById('sharedResponseContainer').style.display = 'none';
+            document.getElementById('profileContainer').style.display = 'none';
+        }
+
+        // Generate shareable URL and store in Firestore
+        async function generateShareUrl(result, method, url) {
+            const responseDoc = await db.collection('shared_responses').add({
+                userId: currentUser.uid,
+                method: method,
+                url: url,
+                status: result.status,
+                headers: result.headers,
+                body: result.body,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            return `${window.location.origin}/share/${responseDoc.id}`;
         }
 
         // Analyze request
@@ -648,6 +673,7 @@
             const method = document.getElementById("methodSelect").value;
             const body = document.getElementById("requestBody").value;
             const headersInput = document.getElementById("headersInput").value;
+            const cookiesInput = document.getElementById("cookiesInput").value;
 
             if (!url) {
                 alert("Please enter a valid URL");
@@ -661,33 +687,42 @@
                     if (key && value) headers[key] = value;
                 });
             }
+            if (cookiesInput) {
+                headers["Cookie"] = cookiesInput;
+            }
 
             document.getElementById("loading").style.display = "block";
 
+            const startTime = performance.now();
             fetch(url, {
                 method: method,
                 headers: headers,
                 body: method !== "GET" && body ? body : null
             })
-            .then(response => response.text().then(data => ({
-                status: response.status,
-                headers: Object.fromEntries(response.headers.entries()),
-                body: data
-            })))
+            .then(response => {
+                const endTime = performance.now();
+                const latency = (endTime - startTime).toFixed(2);
+                return response.text().then(data => ({
+                    status: response.status,
+                    headers: Object.fromEntries(response.headers.entries()),
+                    body: data,
+                    latency: latency
+                }));
+            })
             .then(async result => {
                 document.getElementById("loading").style.display = "none";
+                const shareUrl = await generateShareUrl(result, method, url);
                 const table = document.getElementById("resultTable").getElementsByTagName('tbody')[0];
                 const row = table.insertRow();
                 row.insertCell(0).innerText = `${method} ${url}`;
 
-                const shareId = await saveResponseToFirestore(result, method, url);
-                const shareUrl = `${window.location.origin}${window.location.pathname}?share=${shareId}`;
+                const responseId = `response-${Date.now()}`;
                 let responseCell = row.insertCell(1);
                 let showExpand = result.body.length > 500;
 
                 responseCell.innerHTML = `
-                    ${showExpand ? `<button class="toggle-btn" onclick="toggleResponse('${shareId}')">Expand</button>` : ""}
-                    <div id="response-${shareId}" class="response-container" style="${showExpand ? 'display: none;' : ''}">
+                    ${showExpand ? `<button class="toggle-btn" onclick="toggleResponse('${responseId}')">Expand</button>` : ""}
+                    <div id="${responseId}" class="response-container" style="${showExpand ? 'display: none;' : ''}">
                         <div class="response-header">Status: ${result.status}</div>
                         <div class="response-content">${formatStatus(result.status)}</div>
                         <div class="response-header">Headers</div>
@@ -695,8 +730,8 @@
                         <div class="response-header">Body</div>
                         <div class="response-content"><pre><code class="language-json">${formatBody(result.body)}</code></pre></div>
                         <div class="share-section">
-                            <input class="share-link" id="share-${shareId}" value="${shareUrl}" readonly>
-                            <button class="copy-btn" onclick="copyShareLink('${shareId}')">Copy</button>
+                            <input class="share-link" id="share-${responseId}" value="${shareUrl}" readonly>
+                            <button class="copy-btn" onclick="copyShareLink('${responseId}')">Copy</button>
                         </div>
                     </div>
                 `;
@@ -704,31 +739,46 @@
                 const actionCell = row.insertCell(2);
                 actionCell.innerHTML = `
                     <button class="action-btn" onclick='viewFullResponse(${JSON.stringify(result)})'><i class="fas fa-eye"></i> View Full</button>
-                    <button class="share-btn" onclick="shareRequest('${shareId}')"><i class="fas fa-share-alt"></i> Share</button>
+                    <button class="share-btn" onclick="shareRequest('${responseId}')"><i class="fas fa-share-alt"></i> Share</button>
                 `;
 
                 Prism.highlightAll();
-                await recordActivity('API Request', `${method} ${url} - Status: ${result.status}`, shareUrl);
+                const requestData = { url, method, body, headersInput, cookiesInput };
+                recordActivity('API Request', `${method} ${url} - Status: ${result.status}`, shareUrl, requestData);
             })
             .catch(error => {
                 document.getElementById("loading").style.display = "none";
                 alert("Error: " + error);
-                recordActivity('API Request Failed', `${method} ${url} - ${error.message}`);
+                recordActivity('API Request Failed', `${url} - ${error.message}`);
             });
         }
 
-        // Save response to Firestore
-        async function saveResponseToFirestore(result, method, url) {
-            const responseDoc = await db.collection('responses').add({
-                userId: currentUser ? currentUser.uid : null,
-                method: method,
-                url: url,
-                status: result.status,
-                headers: result.headers,
-                body: result.body,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            return responseDoc.id;
+        // Edit request from history
+        async function editRequest(activityId) {
+            const doc = await db.collection('users').doc(currentUser.uid).collection('activity').doc(activityId).get();
+            const activity = doc.data();
+            if (activity.requestData) {
+                document.getElementById('urlInput').value = activity.requestData.url || '';
+                document.getElementById('methodSelect').value = activity.requestData.method || 'GET';
+                document.getElementById('requestBody').value = activity.requestData.body || '';
+                document.getElementById('headersInput').value = activity.requestData.headersInput || '';
+                document.getElementById('cookiesInput').value = activity.requestData.cookiesInput || '';
+                hideProfile();
+            }
+        }
+
+        // Resend request from history
+        async function resendRequest(activityId) {
+            const doc = await db.collection('users').doc(currentUser.uid).collection('activity').doc(activityId).get();
+            const activity = doc.data();
+            if (activity.requestData) {
+                document.getElementById('urlInput').value = activity.requestData.url || '';
+                document.getElementById('methodSelect').value = activity.requestData.method || 'GET';
+                document.getElementById('requestBody').value = activity.requestData.body || '';
+                document.getElementById('headersInput').value = activity.requestData.headersInput || '';
+                document.getElementById('cookiesInput').value = activity.requestData.cookiesInput || '';
+                analyzeRequest();
+            }
         }
 
         // Format status
@@ -754,22 +804,23 @@
 
         // Toggle response
         function toggleResponse(responseId) {
-            const responseDiv = document.getElementById(`response-${responseId}`);
+            const responseDiv = document.getElementById(responseId);
             responseDiv.style.display = responseDiv.style.display === "none" ? "block" : "none";
         }
 
         // Copy share link
-        function copyShareLink(shareId) {
-            const linkInput = document.getElementById(`share-${shareId}`);
+        function copyShareLink(responseId) {
+            const linkInput = document.getElementById(`share-${responseId}`);
             linkInput.select();
             document.execCommand('copy');
             alert('Share link copied to clipboard!');
         }
 
         // Share request
-        function shareRequest(shareId) {
-            const linkInput = document.getElementById(`share-${shareId}`);
-            navigator.clipboard.writeText(linkInput.value);
+        function shareRequest(responseId) {
+            const linkInput = document.getElementById(`share-${responseId}`);
+            const shareableLink = linkInput.value;
+            navigator.clipboard.writeText(shareableLink);
             alert("Link copied to clipboard!");
         }
 
@@ -783,49 +834,43 @@
             newWindow.document.write("</body></html>");
         }
 
-        // Display shared response
-        function displaySharedResponse(data) {
-            const container = document.getElementById('sharedResponseContainer');
-            container.innerHTML = `
-                <h2>Shared Response</h2>
-                <div class="response-container">
-                    <div class="response-header">Status: ${data.status}</div>
-                    <div class="response-content">${formatStatus(data.status)}</div>
-                    <div class="response-header">Headers</div>
-                    <div class="response-content">${formatHeaders(data.headers)}</div>
-                    <div class="response-header">Body</div>
-                    <div class="response-content"><pre><code class="language-json">${formatBody(data.body)}</code></pre></div>
-                </div>
-            `;
-            container.style.display = 'block';
-            document.getElementById('appContent').style.display = 'none';
-            document.getElementById('authContainer').style.display = 'none';
-            Prism.highlightAll();
+        // Check for shared response on load
+        function checkForSharedResponse() {
+            const path = window.location.pathname;
+            if (path.startsWith('/share/')) {
+                const shareId = path.split('/share/')[1];
+                loadSharedResponse(shareId);
+            }
         }
 
-        // Check for shared response on load
-        window.onload = function() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const shareId = urlParams.get('share');
-            if (shareId) {
-                db.collection('responses').doc(shareId).get().then(doc => {
-                    if (doc.exists) {
-                        displaySharedResponse(doc.data());
-                    } else {
-                        alert('Shared response not found');
-                    }
+        // Load shared response
+        async function loadSharedResponse(shareId) {
+            const responseDoc = await db.collection('shared_responses').doc(shareId).get();
+            if (responseDoc.exists) {
+                const data = responseDoc.data();
+                viewFullResponse({
+                    status: data.status,
+                    headers: data.headers,
+                    body: data.body
                 });
             } else {
-                auth.onAuthStateChanged(user => {
-                    if (user) {
-                        currentUser = user;
-                        loadUserData();
-                        showAppContent();
-                    } else {
-                        showAuthContainer();
-                    }
-                });
+                alert('Shared response not found');
             }
+        }
+
+        // Initialize app
+        window.onload = function() {
+            auth.onAuthStateChanged(user => {
+                if (user) {
+                    currentUser = user;
+                    loadUserData();
+                    showAppContent();
+                    checkForSharedResponse();
+                } else {
+                    showAuthContainer();
+                    checkForSharedResponse();
+                }
+            });
         };
     </script>
 </body>
